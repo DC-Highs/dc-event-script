@@ -1,0 +1,35 @@
+{
+    "app": {
+        "module_onboarding_check": 1,
+        "default_event_number": 1,
+        "event_date_order": 1,
+        "chest_selection_status": 1
+    },
+    "ui": {
+        "window_mode": "Light Mode",
+        "themes": {
+            "Dark Mode": {
+                "menu_background": "black",
+                "menu_foreground": "white",
+                "menu_list_active_background": "white",
+                "menu_list_active_foreground": "black",
+                "widget_background": "dark gray",
+                "widget_foreground": "white",
+                "window_background": "black",
+                "window_foreground": "white",
+                "checkmark_color": "black"
+            },
+            "Light Mode": {
+                "menu_background": "white",
+                "menu_foreground": "black",
+                "menu_list_active_background": "gray",
+                "menu_list_active_foreground": "black",
+                "widget_background": "light gray",
+                "widget_foreground": "black",
+                "window_background": "white",
+                "window_foreground": "black",
+                "checkmark_color": "white"
+            }
+        }
+    }
+}

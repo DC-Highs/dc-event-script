@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "dc-event-script"
+version = "1.0.2"
+description = "Dragon City Event Script"
+authors = ["Apod <example@email.com>"]
+maintainers = [
+  "Marcuth <me@marcuth.dev>"
+]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.12,<3.15"
+pillow = "^12.1.1"
+xlsxwriter = "^3.2.9"
+opencv-python = "^4.13.0.92"
+numpy = "^2.4.3"
+requests = "^2.32.5"
+openpyxl = "^3.1.5"
+python-dotenv = "^1.2.2"
+
+
+[tool.poetry.scripts]
+start = "src.main:main"
+build = "scripts.build:run_build"
+
+[tool.poetry.group.dev.dependencies]
+pyinstaller = "^6.19.0"
+setuptools = "^82.0.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
