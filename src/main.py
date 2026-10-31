@@ -199,35 +199,46 @@ class DragonCityEventApp(tk.Tk):
         self.status_label.place(x=20, y=260)
 
     def _show_credentials_dialog(self) -> None:
-        """Shows a dialog to update user credentials."""
+        """Shows a dialog to update the API credentials and the game configuration endpoint."""
         dialog = tk.Toplevel(self)
-        dialog.title("Credentials")
-        dialog.geometry("300x180")
+        dialog.title("API Credentials")
+        dialog.geometry("360x280")
         dialog.configure(bg=self.style_prefs.get("window_background", "black"))
-        
-        creds = self.config_manager.get_credentials()
-        
-        tk.Label(dialog, text="User ID:", bg=dialog["bg"], fg="white").pack(pady=5)
-        user_entry = tk.Entry(dialog, width=35)
-        user_entry.insert(0, creds['userId'])
-        user_entry.pack()
-        
-        tk.Label(dialog, text="Auth Token:", bg=dialog["bg"], fg="white").pack(pady=5)
-        auth_entry = tk.Entry(dialog, width=35)
-        auth_entry.insert(0, creds['authToken'])
-        auth_entry.pack()
-        
-        def save():
-            uid = user_entry.get().strip()
-            token = auth_entry.get().strip()
-            if uid and token:
-                self.config_manager.set_credentials(uid, token)
-                messagebox.showinfo("Success", "Credentials saved and persisted!")
-                dialog.destroy()
-            else:
-                messagebox.showwarning("Error", "Fields cannot be empty")
-        
+
+        credentials = self.config_manager.get_credentials()
+        user_entry = self._add_labeled_entry(dialog, "User ID:", credentials['userId'])
+        token_entry = self._add_labeled_entry(dialog, "Auth Token:", credentials['authToken'])
+        url_entry = self._add_labeled_entry(dialog, "Endpoint URL:", self.config_manager.get_game_config_url())
+
+        def save() -> None:
+            self._save_credentials(dialog, user_entry.get(), token_entry.get(), url_entry.get())
+
         tk.Button(dialog, text="Save & Persist", command=save).pack(pady=15)
+
+    def _add_labeled_entry(self, parent: tk.Misc, label: str, value: str) -> tk.Entry:
+        """Adds a label (readable in both themes) with its entry below it."""
+        tk.Label(
+            parent,
+            text=label,
+            bg=self.style_prefs.get("window_background", "black"),
+            fg=self.style_prefs.get("window_foreground", "white")
+        ).pack(pady=5)
+        entry = tk.Entry(parent, width=45)
+        entry.insert(0, value)
+        entry.pack()
+        return entry
+
+    def _save_credentials(self, dialog: tk.Toplevel, user_id: str, auth_token: str, game_config_url: str) -> None:
+        """Persists the dialog values when none of them is empty."""
+        user_id, auth_token, game_config_url = user_id.strip(), auth_token.strip(), game_config_url.strip()
+
+        if not (user_id and auth_token and game_config_url):
+            messagebox.showwarning("Error", "Fields cannot be empty")
+            return
+
+        self.config_manager.set_credentials(user_id, auth_token, game_config_url)
+        messagebox.showinfo("Success", "Credentials saved and persisted!")
+        dialog.destroy()
 
     def _save_game_data(self) -> None:
         """Saves the current game data to a JSON file chosen by the user."""

@@ -66,30 +66,34 @@ class ConfigManager:
             }
         }
 
+    def _stored_credentials(self) -> Dict[str, str]:
+        return self.settings.get('credentials', {})
+
     def get_credentials(self) -> Dict[str, str]:
-        """Returns credentials from environment variables."""
+        """Returns the user credentials, preferring the environment variables over settings.json."""
+        stored = self._stored_credentials()
         return {
-            'userId': os.getenv('DC_USER_ID', '') or self.settings.get('credentials', {}).get('userId', ''),
-            'authToken': os.getenv('DC_AUTH_TOKEN', '') or self.settings.get('credentials', {}).get('authToken', '')
+            'userId': os.getenv('DC_USER_ID', '') or stored.get('userId', ''),
+            'authToken': os.getenv('DC_AUTH_TOKEN', '') or stored.get('authToken', '')
         }
 
     def get_game_config_url(self) -> str:
-        """Returns the game configuration endpoint from the environment variables."""
-        return os.getenv('DC_GAME_CONFIG_URL', '')
+        """Returns the game configuration endpoint, preferring the environment variable over settings.json."""
+        return os.getenv('DC_GAME_CONFIG_URL', '') or self._stored_credentials().get('gameConfigUrl', '')
 
-    def set_credentials(self, user_id: str, auth_token: str) -> None:
-        """Persists credentials and updates local session."""
-        # 1. Update session
+    def set_credentials(self, user_id: str, auth_token: str, game_config_url: Optional[str] = None) -> None:
+        """Updates the session and persists the credentials (and the endpoint, when given) in settings.json."""
         os.environ['DC_USER_ID'] = user_id
         os.environ['DC_AUTH_TOKEN'] = auth_token
-        
-        # 2. Persist in settings.json (safer for distributed apps than rewriting .env)
-        if 'credentials' not in self.settings:
-            self.settings['credentials'] = {}
-        self.settings['credentials']['userId'] = user_id
-        self.settings['credentials']['authToken'] = auth_token
+        stored = self.settings.setdefault('credentials', {})
+        stored['userId'] = user_id
+        stored['authToken'] = auth_token
+
+        if game_config_url is not None:
+            os.environ['DC_GAME_CONFIG_URL'] = game_config_url
+            stored['gameConfigUrl'] = game_config_url
+
         self.save_settings()
-        
         logger.info("Credentials persisted to settings.json")
 
     @property

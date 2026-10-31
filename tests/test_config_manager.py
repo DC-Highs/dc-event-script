@@ -83,6 +83,21 @@ def test_set_credentials_updates_session_and_file(work_dir):
     os.environ.pop("DC_AUTH_TOKEN")
 
 
+def test_set_credentials_persists_the_endpoint(work_dir, monkeypatch):
+    manager = ConfigManager(str(work_dir / "s.json"))
+
+    manager.set_credentials("1", "token", "https://example.com/cfg")
+
+    saved = json.loads((work_dir / "s.json").read_text(encoding="utf-8"))
+    assert saved["credentials"]["gameConfigUrl"] == "https://example.com/cfg"
+    assert os.environ["DC_GAME_CONFIG_URL"] == "https://example.com/cfg"
+
+    for name in ("DC_USER_ID", "DC_AUTH_TOKEN", "DC_GAME_CONFIG_URL"):
+        os.environ.pop(name)
+
+    assert ConfigManager(str(work_dir / "s.json")).get_game_config_url() == "https://example.com/cfg"
+
+
 def test_game_config_url_comes_from_the_environment(work_dir, monkeypatch):
     manager = ConfigManager("missing.json")
     assert manager.get_game_config_url() == ""

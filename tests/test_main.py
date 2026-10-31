@@ -338,25 +338,51 @@ def open_credentials_dialog(app):
     return dialog, entries, button
 
 
-def test_credentials_dialog_persists_the_credentials(app, dialogs, work_dir):
-    dialog, (user_entry, token_entry), button = open_credentials_dialog(app)
-    assert (user_entry.get(), token_entry.get()) == ("42", "secret-token")
+def test_credentials_dialog_has_a_readable_label_for_each_field(app):
+    app._show_credentials_dialog()
+    dialog = [child for child in app.winfo_children() if isinstance(child, tk.Toplevel)][-1]
+    labels = [child for child in dialog.winfo_children() if isinstance(child, tk.Label)]
 
-    user_entry.delete(0, tk.END)
-    user_entry.insert(0, " 99 ")
-    token_entry.delete(0, tk.END)
-    token_entry.insert(0, " new-token ")
+    assert [label.cget("text") for label in labels] == ["User ID:", "Auth Token:", "Endpoint URL:"]
+    assert all(label.cget("fg") != label.cget("bg") for label in labels)
+    assert {label.cget("fg") for label in labels} == {app.style_prefs["window_foreground"]}
+
+
+def test_credentials_dialog_labels_follow_the_dark_theme(work_dir, make_app):
+    (work_dir / "settings.json").write_text(json.dumps({"ui": {"window_mode": "Dark Mode", "themes": {
+        "Dark Mode": {"window_background": "black", "window_foreground": "white"}}}}), encoding="utf-8")
+    app = make_app()
+
+    app._show_credentials_dialog()
+    dialog = [child for child in app.winfo_children() if isinstance(child, tk.Toplevel)][-1]
+    labels = [child for child in dialog.winfo_children() if isinstance(child, tk.Label)]
+
+    assert {(label.cget("fg"), label.cget("bg")) for label in labels} == {("white", "black")}
+
+
+def test_credentials_dialog_persists_the_credentials_and_the_endpoint(app, dialogs, work_dir):
+    dialog, (user_entry, token_entry, url_entry), button = open_credentials_dialog(app)
+    assert (user_entry.get(), token_entry.get(), url_entry.get()) == ("42", "secret-token", CONFIG_URL)
+
+    for entry, value in ((user_entry, " 99 "), (token_entry, " new-token "), (url_entry, " https://new.example.com/cfg ")):
+        entry.delete(0, tk.END)
+        entry.insert(0, value)
+
     button.invoke()
 
     saved = json.loads((work_dir / "settings.json").read_text(encoding="utf-8"))
-    assert saved["credentials"] == {"userId": "99", "authToken": "new-token"}
+    assert saved["credentials"] == {
+        "userId": "99", "authToken": "new-token", "gameConfigUrl": "https://new.example.com/cfg",
+    }
+    assert app.config_manager.get_game_config_url() == "https://new.example.com/cfg"
     assert dialogs.last()[0] == "showinfo"
     assert not dialog.winfo_exists()
 
 
-def test_credentials_dialog_rejects_empty_fields(app, dialogs, work_dir):
-    dialog, (user_entry, _), button = open_credentials_dialog(app)
-    user_entry.delete(0, tk.END)
+@pytest.mark.parametrize("empty_index", [0, 1, 2])
+def test_credentials_dialog_rejects_empty_fields(app, dialogs, work_dir, empty_index):
+    dialog, entries, button = open_credentials_dialog(app)
+    entries[empty_index].delete(0, tk.END)
 
     button.invoke()
 
