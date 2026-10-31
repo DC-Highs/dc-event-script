@@ -28,6 +28,24 @@ build = "scripts.build:run_build"
 [tool.poetry.group.dev.dependencies]
 pyinstaller = "^6.19.0"
 setuptools = "^82.0.1"
+pytest = "^9.2.0"
+pytest-cov = "^7.1.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["src", "scripts"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
 
 [build-system]
 requires = ["poetry-core"]
