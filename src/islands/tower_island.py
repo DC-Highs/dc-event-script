@@ -1,78 +1,72 @@
-import time
 import logging
 import os
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-from typing import Dict, Any, List, Optional, Tuple
+from PIL import Image
 
 from src.utils.image_processing import load_image_as_array
 
 logger = logging.getLogger(__name__)
+
+TEMPLATE_PATH = os.path.join("assets", "templates", "Tower_Template_DO_NOT_DELETE.jpg")
+LEGACY_TEMPLATE_PATH = os.path.join("Archive", "Tower_Island", "Tower_Template_DO_NOT_DELETE.jpg")
+CELL_SIZE = 100
+FLOOR_HEIGHT_IN_SQUARES = 5
+SQUARE_COLORS: Dict[str, int] = {
+    'CATAPULT': 150,
+    'SINGLE_REWARD': 100,
+    'SINGLE_DRAGON_PIECE': 175,
+    'FINAL_DRAGON_SQUARE': 0,
+}
+
+
+def load_tower_template() -> Optional[np.ndarray]:
+    """Loads the empty tower, falling back to the legacy location when the template is missing."""
+    path: str = TEMPLATE_PATH if os.path.exists(TEMPLATE_PATH) else LEGACY_TEMPLATE_PATH
+    return load_image_as_array(path)
+
+
+def square_bounds(shape: Tuple[int, ...], x: int, y: int) -> Tuple[int, int, int, int]:
+    """Pixel rows and columns `(y_start, y_end, x_start, x_end)` of a square, clipped to the template."""
+    floor_gap: int = FLOOR_HEIGHT_IN_SQUARES * int((y - 1) / FLOOR_HEIGHT_IN_SQUARES)
+    y_bottom: int = shape[0] - (CELL_SIZE * (y - 1) + y + floor_gap)
+    y_top: int = shape[0] - (CELL_SIZE * (y - 1) + y + CELL_SIZE + floor_gap)
+    x_start: int = CELL_SIZE * (x - 1) + x
+    x_end: int = (CELL_SIZE + 1) * x
+    return max(0, y_top), min(shape[0], y_bottom), max(0, x_start), min(shape[1], x_end)
+
+
+def mark_squares(tower_array: np.ndarray, squares: List[Dict[str, Any]]) -> None:
+    """Paints the squares that hold something (catapults, rewards, dragon pieces and the final dragon)."""
+    for square in squares:
+        color: Optional[int] = SQUARE_COLORS.get(square.get('type', ''))
+        if color is None:
+            continue
+
+        y_start, y_end, x_start, x_end = square_bounds(tower_array.shape, square['x'], square['y'])
+        tower_array[y_start:y_end, x_start:x_end] = color
+
 
 def process_tower_island(app: Any) -> None:
     """Processes Tower Island event data."""
     start_time: float = time.perf_counter()
     logger.info("Starting Tower Island event processing")
 
-    # Assets configuration
-    template_path: str = os.path.join("assets", "templates", "Tower_Template_DO_NOT_DELETE.jpg")
-    if not os.path.exists(template_path):
-        # Fallback to older logic if assets missing
-        template_path = os.path.join("Archive", 'Tower_Island', 'Tower_Template_DO_NOT_DELETE.jpg')
-        
-    tower_array: Optional[np.ndarray] = load_image_as_array(template_path)
+    tower_array: Optional[np.ndarray] = load_tower_template()
     if tower_array is None:
         logger.error("Could not load tower template.")
         return
 
     tower_data: Dict[str, Any] = app.data_view['tower_island']
-    # Use selected event number
     event_info: Dict[str, Any] = tower_data['islands'][app.event_number]
-    
-    event_start_str: str = time.strftime("%d %b %Y", time.gmtime(event_info['start_ts']))
-    report_path: str = os.path.join(app.event_fp, f"Tower_Island_Key_{event_start_str}.txt")
-    output_img_path: str = os.path.join(app.event_fp, f"Tower_Map_{event_start_str}.jpg")
+    event_start: str = time.strftime("%d %b %Y", time.gmtime(event_info['start_ts']))
 
-    # Marking locations on board
-    for square in tower_data.get('squares', []):
-        draw_rect: bool = False
-        color: int = 255
-        
-        sq_type: str = square.get('type', '')
-        if sq_type == 'CATAPULT':
-            color = 150
-            draw_rect = True
-        elif sq_type == 'SINGLE_REWARD':
-            color = 100
-            draw_rect = True
-        elif sq_type == 'SINGLE_DRAGON_PIECE':
-            color = 175
-            draw_rect = True
-        elif sq_type == 'FINAL_DRAGON_SQUARE':
-            color = 0
-            draw_rect = True
-            
-        if draw_rect:
-            y, x = square['y'], square['x']
-            # Original complex coordinate mapping for the Tower board
-            y1: int = tower_array.shape[0] - (100 * (y - 1) + y + 5 * int((y - 1) / 5))
-            y2: int = tower_array.shape[0] - (100 * (y - 1) + y + 100 + 5 * int((y - 1) / 5))
-            x1: int = 100 * (x - 1) + x
-            x2: int = 101 * x
-            
-            # Bound checking
-            y2 = max(0, y2)
-            y1 = min(tower_array.shape[0], y1)
-            x1 = max(0, x1)
-            x2 = min(tower_array.shape[1], x2)
-            
-            tower_array[y2:y1, x1:x2] = color
+    mark_squares(tower_array, tower_data.get('squares', []))
 
-    img: Image.Image = Image.fromarray(tower_array)
-    # Output file creation
-    with open(report_path, 'w') as f:
-        f.write("Tower Island Rewards Key\n")
-        # Simplified reward list
-        
-    img.save(output_img_path)
+    with open(os.path.join(app.event_fp, f"Tower_Island_Key_{event_start}.txt"), 'w') as report:
+        report.write("Tower Island Rewards Key\n")
+
+    Image.fromarray(tower_array).save(os.path.join(app.event_fp, f"Tower_Map_{event_start}.jpg"))
     logger.info(f"Tower Island processing completed in {time.perf_counter() - start_time:.2f}s")

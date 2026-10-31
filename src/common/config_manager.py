@@ -11,8 +11,7 @@ class ConfigManager:
     
     def __init__(self, settings_file: str = 'settings.json'):
         self.settings_path: str = settings_file
-        
-        # Load environment variables from .env
+
         load_dotenv()
         
         self.settings: Dict[str, Any] = self.load_settings(settings_file)

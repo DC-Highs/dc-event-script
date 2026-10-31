@@ -6,7 +6,6 @@ def run_build():
     """Builds the standalone executable using PyInstaller."""
     print("🚀 Starting build process...")
     
-    # Define paths and arguments
     args = [
         "pyinstaller",
         "--noconsole",

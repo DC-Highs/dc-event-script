@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import messagebox, filedialog
 import asyncio
 import json
 import os
@@ -7,7 +7,6 @@ import sys
 import time
 import threading
 import logging
-import numpy as np
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import httpx
@@ -15,7 +14,6 @@ from dc_config import Config, FetchOptions
 from dc_core import ConfigLanguage
 from dc_localization import Localization
 
-# Fix imports for local structure
 from src.common.logger import setup_logging
 from src.common.config_manager import ConfigManager
 from src.islands.fog_island import process_fog_event
@@ -28,94 +26,108 @@ from src.islands.tower_island import process_tower_island
 from src.utils.events import EVENT_SECTIONS, STATUS_STYLES, EventStatus, format_island_label, get_event_status
 
 REQUEST_TIMEOUT_SECONDS: float = 120.0
+DEFAULT_BACKGROUND: str = "black"
+DEFAULT_FOREGROUND: str = "white"
+DEFAULT_MENU_BACKGROUND: str = "#333"
+
 
 class DragonCityEventApp(tk.Tk):
     """Main Application for Dragon City Event tools."""
-    
+
     def __init__(self) -> None:
         super().__init__()
         self.logger: logging.Logger = setup_logging()
         self.logger.info("Initializing Dragon City Event App")
-        
+
         self.config_manager: ConfigManager = ConfigManager()
         self.style_prefs: Dict[str, str] = {}
         self._set_style_preferences()
-        
+
+        self._init_game_data()
+        self._init_event_state()
+        self._init_ui_variables()
+        self._init_window()
+        self._setup_ui()
+        self._load_initial_data()
+
+    def _init_game_data(self) -> None:
         self.data_view: Dict[str, Any] = {}
         self.dragon_info: Dict[int, Any] = {}
         self.chest_ids: Dict[int, Any] = {}
         self.localization: Localization = Localization(ConfigLanguage.ENGLISH, {})
         self.asset_versioning: Dict[str, Any] = {'chests': {}}
-        
-        # Internal state for islands
+
+    def _init_event_state(self) -> None:
         self.event_number: int = 0
         self.chests_desired: List[int] = []
         self.chests_desired_names: List[str] = []
         self.event_fp: str = ""
         self.last_save_dir: str = os.getcwd()
         self.clock: Callable[[], float] = time.time
-
-        # UI state variables
-        self.event_chosen: tk.StringVar = tk.StringVar(value="Select One")
-        self.event_dates_string: tk.StringVar = tk.StringVar(value="Select Event Type First")
-        self.event_order_reversed: tk.IntVar = tk.IntVar(value=int(self.config_manager.app_config.get("event_date_order", 0)))
-        self.select_all_chests: tk.IntVar = tk.IntVar(value=int(self.config_manager.app_config.get("chest_selection_status", 1)))
-        
         self.asset_zip_fp: List[str] = ['/mobile/ui/', '/HD/dxt5/']
 
-        # Setup GUI
+    def _init_ui_variables(self) -> None:
+        app_config: Dict[str, Any] = self.config_manager.app_config
+        self.event_chosen: tk.StringVar = tk.StringVar(value="Select One")
+        self.event_dates_string: tk.StringVar = tk.StringVar(value="Select Event Type First")
+        self.event_order_reversed: tk.IntVar = tk.IntVar(value=int(app_config.get("event_date_order", 0)))
+        self.select_all_chests: tk.IntVar = tk.IntVar(value=int(app_config.get("chest_selection_status", 1)))
+
+    def _init_window(self) -> None:
         self.title("DC Event Script - Fork by DC Highs")
         self.geometry("450x300")
         self.resizable(False, False)
-        self._setup_ui()
-        
-        # Load Initial Data
-        self._load_initial_data()
 
     def _set_style_preferences(self) -> None:
         ui_cfg = self.config_manager.ui_config
         mode: str = ui_cfg.get("window_mode", "Dark Mode")
         themes = ui_cfg.get("themes", {})
-        
+
         self.style_prefs = themes.get(mode, {
-            "window_background": "black", 
+            "window_background": "black",
             "window_foreground": "white",
             "menu_background": "#333333",
             "menu_foreground": "white"
         })
 
-    def _load_initial_data(self) -> None:
-        """Fetches game configuration and translations."""
+    def _resolve_credentials(self) -> Dict[str, str]:
+        """Credentials from the settings/.env, falling back to the command line arguments."""
         credentials: Dict[str, str] = self.config_manager.get_credentials()
-        
-        # Fallback to sys args if .env is empty
+
         if not credentials['userId'] and len(sys.argv) >= 3:
             credentials = {'userId': sys.argv[1], 'authToken': sys.argv[2]}
-            
+
         if not credentials['userId'] or not credentials['authToken']:
             self.logger.warning("No credentials found in .env or sys args.")
-            
+
+        return credentials
+
+    def _load_initial_data(self) -> None:
+        """Fetches game configuration and translations."""
+        credentials: Dict[str, str] = self._resolve_credentials()
+
         try:
             asyncio.run(self._fetch_game_data(credentials))
-
-            # Parse Chests and Dragons
-            for chest in self.data_view.get('chests', {}).get('chests', []):
-                self.chest_ids[chest['id']] = {"chest_name_key": chest['chest_name_key'], "img_name": chest['img_name']}
-            
-            for item in self.data_view.get('items', []):
-                if item.get('group_type') == 'DRAGON':
-                    self.dragon_info[item['id']] = item
-                    
-            for asset in self.data_view.get('asset_versioning', {}).get('chests', []):
-                self.asset_versioning['chests'][asset['name']] = {
-                    'Format': asset['format'], 
-                    "Version": asset['asset_version']
-                }
+            self._index_game_data()
             self.logger.info("Data loaded successfully.")
-            
         except Exception as e:
             self.logger.error(f"Failed to load data: {e}")
             messagebox.showerror("Error", f"Failed to load game data: {e}")
+
+    def _index_game_data(self) -> None:
+        """Indexes the chests, dragons and chest asset versions of the configuration by id/name."""
+        for chest in self.data_view.get('chests', {}).get('chests', []):
+            self.chest_ids[chest['id']] = {"chest_name_key": chest['chest_name_key'], "img_name": chest['img_name']}
+
+        for item in self.data_view.get('items', []):
+            if item.get('group_type') == 'DRAGON':
+                self.dragon_info[item['id']] = item
+
+        for asset in self.data_view.get('asset_versioning', {}).get('chests', []):
+            self.asset_versioning['chests'][asset['name']] = {
+                'Format': asset['format'],
+                "Version": asset['asset_version']
+            }
 
     async def _fetch_game_data(self, credentials: Dict[str, str]) -> None:
         """Fetches the game configuration sections and the English translations."""
@@ -124,73 +136,92 @@ class DragonCityEventApp(tk.Tk):
         if not url:
             raise ValueError("DC_GAME_CONFIG_URL is not set in the .env file.")
 
-        options: FetchOptions = FetchOptions(
+        await self._fetch_configuration(FetchOptions(
             url=url,
             user_id=credentials['userId'],
             auth_token=credentials['authToken']
-        )
+        ))
+        await self._fetch_translations()
 
-        # Social Point's dynamic URLs do not always present a valid certificate
+    async def _fetch_configuration(self, options: FetchOptions) -> None:
+        """Downloads the configuration; the server's dynamic URLs do not always present a valid certificate."""
         async with httpx.AsyncClient(verify=False, timeout=REQUEST_TIMEOUT_SECONDS, follow_redirects=True) as client:
             self.logger.info("Fetching game configuration...")
             game_config = await Config.fetch(options, client)
             self.data_view = game_config.config.sections
 
+    async def _fetch_translations(self) -> None:
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS, follow_redirects=True) as client:
             self.logger.info("Fetching translations...")
             self.localization = await Localization.create(ConfigLanguage.ENGLISH, client)
 
     def _setup_ui(self) -> None:
-        self.configure(bg=self.style_prefs.get("window_background", "black"))
-        
-        canvas: tk.Canvas = tk.Canvas(self, bg=self.style_prefs.get("window_background", "black"), highlightthickness=0)
-        canvas.pack(fill=tk.BOTH, expand=True)
-        
-        # Event Type List
-        tk.Label(self, text="Event Type", bg=self.style_prefs.get("window_background", "black"), fg=self.style_prefs.get("window_foreground", "white")).place(x=20, y=20)
-        
+        background: str = self.style_prefs.get("window_background", DEFAULT_BACKGROUND)
+        self.configure(bg=background)
+        tk.Canvas(self, bg=background, highlightthickness=0).pack(fill=tk.BOTH, expand=True)
+
+        self._build_event_type_list()
+        self._build_event_dates_list()
+        self._build_action_buttons()
+        self._build_status_area()
+
+    def _themed_label(self, text: str, x: int, y: int) -> tk.Label:
+        label = tk.Label(
+            self,
+            text=text,
+            bg=self.style_prefs.get("window_background", DEFAULT_BACKGROUND),
+            fg=self.style_prefs.get("window_foreground", DEFAULT_FOREGROUND)
+        )
+        label.place(x=x, y=y)
+        return label
+
+    def _build_event_type_list(self) -> None:
+        self._themed_label("Event Type", x=20, y=20)
+
         self.event_listbox: tk.Listbox = tk.Listbox(self, selectmode="SINGLE", exportselection=0)
         self.event_listbox.configure(
-            bg=self.style_prefs.get("menu_background", "#333"),
-            fg=self.style_prefs.get("menu_foreground", "white"),
+            bg=self.style_prefs.get("menu_background", DEFAULT_MENU_BACKGROUND),
+            fg=self.style_prefs.get("menu_foreground", DEFAULT_FOREGROUND),
             selectbackground=self.style_prefs.get("menu_list_active_background", "blue")
         )
-        types: List[str] = ["Fog Island", "Grid Island", "Heroic Race", "Maze Island", "Puzzle Island", "Runner Island", "Tower Island"]
-        for idx, name in enumerate(types):
+        for idx, name in enumerate(EVENT_SECTIONS):
             self.event_listbox.insert(idx, name)
-            
+
         self.event_listbox.bind('<<ListboxSelect>>', self._on_event_type_select)
         self.event_listbox.place(x=20, y=50, width=120, height=150)
-        
-        # Event Dates List
-        tk.Label(self, text="Available Events", bg=self.style_prefs.get("window_background", "black"), fg=self.style_prefs.get("window_foreground", "white")).place(x=160, y=20)
-        
+
+    def _build_event_dates_list(self) -> None:
+        self._themed_label("Available Events", x=160, y=20)
+
         date_frame: tk.Frame = tk.Frame(self)
         date_frame.place(x=160, y=50, width=240, height=150)
-        
+
         scrollbar: tk.Scrollbar = tk.Scrollbar(date_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.dates_listbox: tk.Listbox = tk.Listbox(date_frame, selectmode="SINGLE", yscrollcommand=scrollbar.set, exportselection=0)
+
+        self.dates_listbox: tk.Listbox = tk.Listbox(
+            date_frame, selectmode="SINGLE", yscrollcommand=scrollbar.set, exportselection=0
+        )
         self.dates_listbox.configure(
-            bg=self.style_prefs.get("menu_background", "#333"),
-            fg=self.style_prefs.get("menu_foreground", "white")
+            bg=self.style_prefs.get("menu_background", DEFAULT_MENU_BACKGROUND),
+            fg=self.style_prefs.get("menu_foreground", DEFAULT_FOREGROUND)
         )
         self.dates_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.dates_listbox.yview)
-        
-        # Actions
-        btn_start: tk.Button = tk.Button(self, text="Process Event", command=self._start_processing)
-        btn_start.place(x=20, y=220, width=120)
-        
-        btn_save: tk.Button = tk.Button(self, text="Save JSON", command=self._save_game_data)
-        btn_save.place(x=160, y=220, width=120)
 
-        btn_creds: tk.Button = tk.Button(self, text="API Credentials", command=self._show_credentials_dialog)
-        btn_creds.place(x=300, y=220, width=120)
+    def _build_action_buttons(self) -> None:
+        buttons: List[Tuple[str, Callable[[], None], int]] = [
+            ("Process Event", self._start_processing, 20),
+            ("Save JSON", self._save_game_data, 160),
+            ("API Credentials", self._show_credentials_dialog, 300),
+        ]
+        for text, command, x in buttons:
+            tk.Button(self, text=text, command=command).place(x=x, y=220, width=120)
 
-        # Status
-        self.status_label: tk.Label = tk.Label(self, text="", bg=self.style_prefs.get("window_background", "black"))
+    def _build_status_area(self) -> None:
+        self.status_label: tk.Label = tk.Label(
+            self, text="", bg=self.style_prefs.get("window_background", DEFAULT_BACKGROUND)
+        )
         self.status_label.place(x=20, y=260)
         self._build_status_legend()
 
@@ -209,7 +240,7 @@ class DragonCityEventApp(tk.Tk):
         dialog = tk.Toplevel(self)
         dialog.title("API Credentials")
         dialog.geometry("360x280")
-        dialog.configure(bg=self.style_prefs.get("window_background", "black"))
+        dialog.configure(bg=self.style_prefs.get("window_background", DEFAULT_BACKGROUND))
 
         credentials = self.config_manager.get_credentials()
         user_entry = self._add_labeled_entry(dialog, "User ID:", credentials['userId'])
@@ -226,8 +257,8 @@ class DragonCityEventApp(tk.Tk):
         tk.Label(
             parent,
             text=label,
-            bg=self.style_prefs.get("window_background", "black"),
-            fg=self.style_prefs.get("window_foreground", "white")
+            bg=self.style_prefs.get("window_background", DEFAULT_BACKGROUND),
+            fg=self.style_prefs.get("window_foreground", DEFAULT_FOREGROUND)
         ).pack(pady=5)
         entry = tk.Entry(parent, width=45)
         entry.insert(0, value)
@@ -275,8 +306,9 @@ class DragonCityEventApp(tk.Tk):
 
     def _on_event_type_select(self, event: tk.Event) -> None:
         selection: tuple = self.event_listbox.curselection()
-        if not selection: return
-        
+        if not selection:
+            return
+
         event_name: str = self.event_listbox.get(selection[0])
         self.event_chosen.set(event_name)
         self.logger.info(f"Selected event type: {event_name}")
@@ -298,7 +330,9 @@ class DragonCityEventApp(tk.Tk):
 
     def _get_selected_island_index(self) -> Optional[int]:
         selection: tuple = self.dates_listbox.curselection()
-        if not selection: return None
+        if not selection:
+            return None
+
         text: str = self.dates_listbox.get(selection[0])
         try:
             return int(text.split(']')[0][1:])
@@ -310,43 +344,45 @@ class DragonCityEventApp(tk.Tk):
         if idx is None:
             messagebox.showwarning("Warning", "Please select an event date.")
             return
-            
+
         self.event_number = idx
         self.event_dates_string.set(self.dates_listbox.get(self.dates_listbox.curselection()[0]))
-        
-        # Prepare output dir
+        self._prepare_output_folder()
+        self._clear_chest_selection()
+
+        self.status_label.config(text="Processing...", fg="orange")
+        threading.Thread(target=self._run_event_logic).start()
+
+    def _prepare_output_folder(self) -> None:
         event_name: str = self.event_chosen.get().replace(" ", "_")
         safe_date_str: str = self.event_dates_string.get().replace(" ", "_").replace("[", "").replace("]", "")
         self.event_fp = os.path.join("output", event_name, safe_date_str)
-        if not os.path.exists(self.event_fp):
-            os.makedirs(self.event_fp)
+        os.makedirs(self.event_fp, exist_ok=True)
 
-        # Mock chests for now or trigger selection popup
-        self.chests_desired = [] 
+    def _clear_chest_selection(self) -> None:
+        """There is no chest selection screen yet, so every event starts without chosen chests."""
+        self.chests_desired = []
         self.chests_desired_names = []
-        
-        self.status_label.config(text="Processing...", fg="orange")
-        threading.Thread(target=self._run_event_logic).start()
+
+    def _island_processors(self) -> Dict[str, Callable[[Any], None]]:
+        return {
+            "Fog Island": process_fog_event,
+            "Grid Island": process_grid_event,
+            "Heroic Race": process_heroic_race,
+            "Maze Island": process_maze_island,
+            "Puzzle Island": process_puzzle_island,
+            "Runner Island": process_runner_island,
+            "Tower Island": process_tower_island,
+        }
 
     def _run_event_logic(self) -> None:
         start_time: float = time.time()
         try:
             event_type: str = self.event_chosen.get()
-            if event_type == "Fog Island":
-                process_fog_event(self)
-            elif event_type == "Grid Island":
-                process_grid_event(self)
-            elif event_type == "Heroic Race":
-                process_heroic_race(self)
-            elif event_type == "Maze Island":
-                process_maze_island(self)
-            elif event_type == "Puzzle Island":
-                process_puzzle_island(self)
-            elif event_type == "Runner Island":
-                process_runner_island(self)
-            elif event_type == "Tower Island":
-                process_tower_island(self)
-            
+            processor: Optional[Callable[[Any], None]] = self._island_processors().get(event_type)
+            if processor is not None:
+                processor(self)
+
             self.logger.info(f"Finished processing {event_type} in {time.time() - start_time:.2f}s")
             self.after(0, lambda: self.status_label.config(text="Completed!", fg="green"))
         except Exception as e:
@@ -354,10 +390,12 @@ class DragonCityEventApp(tk.Tk):
             self.after(0, lambda: self.status_label.config(text="Failed!", fg="red"))
             self.after(0, lambda err=e: messagebox.showerror("Error", str(err)))
 
+
 def main() -> None:
     """Poetry entry point."""
     app = DragonCityEventApp()
     app.mainloop()
+
 
 if __name__ == "__main__":
     main()
