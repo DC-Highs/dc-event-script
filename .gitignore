@@ -176,3 +176,6 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+# Local app settings: the app stores the API credentials here
+settings.json
