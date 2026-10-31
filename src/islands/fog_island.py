@@ -201,20 +201,16 @@ def process_fog_event(app: Any) -> None:
         if square['type'] == 'CHEST':
             grid_id = square['type_id']
             if grid_id in chests_of_interest:
-                try:
-                    chest_idx: int = chests_of_interest.index(grid_id) + 1
-                    output_text = f"Chest #{chest_idx}"
-                    fill_color = 255 # White
-                except ValueError:
-                    fill_color = 0
+                chest_idx: int = chests_of_interest.index(grid_id) + 1
+                output_text = f"Chest #{chest_idx}"
+                fill_color = 255 # White
             
-            # Place Icon
-            if grid_id in rewards['CHEST']:
-                icon: Image.Image = rewards['CHEST'][grid_id]
-                boards_visual["all"].paste(icon, (x_p + 15, y_p + 15))
-                if grid_id in chests_of_interest:
-                    boards_visual["chests"].paste(icon, (x_p + 15, y_p + 15))
-                    boards_visual["both"].paste(icon, (x_p + 15, y_p + 15))
+            # Place Icon (every chest square got an icon while downloading)
+            icon: Image.Image = rewards['CHEST'][grid_id]
+            boards_visual["all"].paste(icon, (x_p + 15, y_p + 15))
+            if grid_id in chests_of_interest:
+                boards_visual["chests"].paste(icon, (x_p + 15, y_p + 15))
+                boards_visual["both"].paste(icon, (x_p + 15, y_p + 15))
 
         elif square['type'] == 'DRAGON_PIECE':
             grid_idx: int = dragon_reward_map[square['reward_id']]
