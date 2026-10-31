@@ -35,7 +35,7 @@ def process_heroic_race(app: Any) -> None:
     template_path: str = os.path.join("assets", "templates", "Kedai_Template.xlsx")
     excel_output_path: str = os.path.join(app.event_fp, f"Heroic_Race_{event_start_str}.xlsx")
 
-    heroic_name: str = app.local_dict.get(f"tid_unit_{event_info['dragon_race_id']}_name", "Heroic Dragon")
+    heroic_name: str = app.localization.get_dragon_name(event_info['dragon_race_id']) or "Heroic Dragon"
 
     with open(report_path, 'w') as f:
         # Load Excel if template exists

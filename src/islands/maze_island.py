@@ -95,7 +95,7 @@ def process_maze_island(app: Any) -> Optional[Tuple[List[Tuple[int, int, int]], 
         path_numbers.append(path_id)
         
         d_id = path['dragon_type']
-        d_name: str = app.local_dict.get(f"tid_unit_{d_id}_name", "Unknown Dragon")
+        d_name: str = app.localization.get_dragon_name(d_id) or "Unknown Dragon"
         dragon_names.append(d_name.replace(" Dragon", ""))
 
     # Iterating through nodes and writing to excel (simplified logic)

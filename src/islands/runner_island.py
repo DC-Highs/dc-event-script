@@ -29,7 +29,7 @@ def process_runner_island(app: Any) -> None:
             pool: List[int] = pool_map[pool_id]['missions']
             for m_id in pool:
                 m: Dict[str, Any] = missions_map[m_id]
-                m_type: str = app.local_dict.get(m['type'], m['type'])
+                m_type: str = app.localization.get_value_from_key(m['type']) or m['type']
                 f.write(f"Type: {m_type}, Goal: {m['goal_points']}\n")
             f.write("\n")
 
@@ -49,6 +49,6 @@ def _get_reward_desc(reward: Dict[str, Any], app: Any) -> str:
         return f"Chest: {reward['chest']}"
     if 'seeds' in reward:
         d_id = reward['seeds'][0]['id']
-        name = app.local_dict.get(f"tid_unit_{d_id}_name", "Unknown")
+        name = app.localization.get_dragon_name(d_id) or "Unknown"
         return f"{reward['seeds'][0]['amount']} Orbs of {name}"
     return str(reward)

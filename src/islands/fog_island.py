@@ -78,10 +78,10 @@ def process_fog_event(app: Any) -> None:
         else:
             chests_of_interest.append(chest)
             
-    # Process dragon rewards
-    dragon_reward_map: Dict[int, int] = {drag['id']: idx for idx, drag in enumerate(fog_data["rewards"])}
-    # Sort rewards by ID
+    # Sort rewards by ID first to ensure indices are consistent
     fog_data["rewards"] = sorted(fog_data["rewards"], key=lambda x: x['id'])
+    # Map reward ID to its index in the sorted rewards list
+    dragon_reward_map: Dict[int, int] = {drag['id']: idx for idx, drag in enumerate(fog_data["rewards"])}
 
     location_log_path: str = os.path.join(app.event_fp, "placement_locations.txt")
     missing_images_path: str = os.path.join(app.event_fp, "missing_images.txt")
@@ -123,7 +123,7 @@ def process_fog_event(app: Any) -> None:
             elif square['type'] == 'DRAGON_PIECE':
                 grid_id = dragon_reward_map[square['reward_id']]
                 if grid_id not in rewards['DRAGON_PIECE']:
-                    dragon_id: int = fog_data['rewards'][square['reward_id']-1]['reward_id']
+                    dragon_id: int = fog_data['rewards'][grid_id]['reward_id']
                     dragon_img_name: str = app.dragon_info[dragon_id]['img_name_mobile']
                     dragon_url = f"https://dca-static-s1.socialpointgames.com/static/dragoncity/mobile/ui/dragons/HD/thumb_{dragon_img_name}_3.png"
                     
@@ -252,7 +252,7 @@ def process_fog_event(app: Any) -> None:
     with open(os.path.join(app.event_fp, "reward_keys.txt"), 'w') as key_file:
         key_file.write("--- Dragon Piece Key ---\n")
         for drag in fog_data['rewards']:
-            name: str = app.local_dict.get(f"tid_unit_{drag['reward_id']}_name", "Unknown")
+            name: str = app.localization.get_dragon_name(drag['reward_id']) or "Unknown"
             key_file.write(f"#{drag['id']}: {name}\n")
             
         key_file.write("\n--- Chest Key ---\n")

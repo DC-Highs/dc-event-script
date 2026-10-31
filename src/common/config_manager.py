@@ -73,6 +73,10 @@ class ConfigManager:
             'authToken': os.getenv('DC_AUTH_TOKEN', '') or self.settings.get('credentials', {}).get('authToken', '')
         }
 
+    def get_game_config_url(self) -> str:
+        """Returns the game configuration endpoint from the environment variables."""
+        return os.getenv('DC_GAME_CONFIG_URL', '')
+
     def set_credentials(self, user_id: str, auth_token: str) -> None:
         """Persists credentials and updates local session."""
         # 1. Update session

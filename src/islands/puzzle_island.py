@@ -61,7 +61,7 @@ def _get_reward_name(reward: Dict[str, Any], app: Any) -> str:
         return f"Chest: {reward['chest']}" 
     if 'seeds' in reward:
         d_id = reward['seeds'][0]['id']
-        name = app.local_dict.get(f"tid_unit_{d_id}_name", "Unknown")
+        name = app.localization.get_dragon_name(d_id) or "Unknown"
         return f"{reward['seeds'][0]['amount']} Orbs of {name}"
     return str(reward)
 

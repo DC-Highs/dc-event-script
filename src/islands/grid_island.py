@@ -3,7 +3,7 @@ import time
 from PIL import Image, ImageDraw, ImageFont
 import os
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Tuple
 
 from src.utils.image_processing import load_image_as_array
 
@@ -81,7 +81,7 @@ def process_grid_event(app: Any) -> None:
                         except ValueError:
                             pass
                     elif square['type'] == 'DRAGON':
-                        name: str = app.local_dict.get(f"tid_unit_{square['type_id']}_name", f"Dragon {square['type_id']}")
+                        name: str = app.localization.get_dragon_name(square['type_id']) or f"Dragon {square['type_id']}"
                         f.write(f"D{dragon_count}: {name}\n")
                         draw.text((x_pos, label_y), f"D{dragon_count}", fill=255, font=font)
                         dragon_count += 1

@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import requests
+import asyncio
 import json
 import os
 import sys
@@ -8,8 +8,12 @@ import time
 import threading
 import logging
 import numpy as np
-import urllib3
 from typing import Dict, Any, List, Optional, Tuple
+
+import httpx
+from dc_config import Config, FetchOptions
+from dc_core import ConfigLanguage
+from dc_localization import Localization
 
 # Fix imports for local structure
 from src.common.logger import setup_logging
@@ -22,8 +26,7 @@ from src.islands.puzzle_island import process_puzzle_island
 from src.islands.runner_island import process_runner_island
 from src.islands.tower_island import process_tower_island
 
-# Disable SSL warnings for Social Point's dynamic URLs
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+REQUEST_TIMEOUT_SECONDS: float = 120.0
 
 class DragonCityEventApp(tk.Tk):
     """Main Application for Dragon City Event tools."""
@@ -40,7 +43,7 @@ class DragonCityEventApp(tk.Tk):
         self.data_view: Dict[str, Any] = {}
         self.dragon_info: Dict[int, Any] = {}
         self.chest_ids: Dict[int, Any] = {}
-        self.local_dict: Dict[str, str] = {}
+        self.localization: Localization = Localization(ConfigLanguage.ENGLISH, {})
         self.asset_versioning: Dict[str, Any] = {'chests': {}}
         
         # Internal state for islands
@@ -65,7 +68,9 @@ class DragonCityEventApp(tk.Tk):
         }
 
         # Setup GUI
-        self.title("Dragon City Events")
+        self.title("DC Event Script - Fork by DC Highs")
+        self.geometry("450x300")
+        self.resizable(False, False)
         self._setup_ui()
         
         # Load Initial Data
@@ -85,7 +90,6 @@ class DragonCityEventApp(tk.Tk):
 
     def _load_initial_data(self) -> None:
         """Fetches game configuration and translations."""
-        url: str = 'https://dc-3rdparty.socialpointgames.com/game-config'
         credentials: Dict[str, str] = self.config_manager.get_credentials()
         
         # Fallback to sys args if .env is empty
@@ -96,22 +100,8 @@ class DragonCityEventApp(tk.Tk):
             self.logger.warning("No credentials found in .env or sys args.")
             
         try:
-            self.logger.info("Fetching game configuration...")
-            response: requests.Response = requests.post(url, credentials, verify=False)
-            response.raise_for_status()
-            config_data: Dict[str, Any] = response.json()
-            self.data_view = config_data['game_data']['config']
-            
-            # Load translations
-            trans_url: str = 'http://sp-translations.socialpointgames.com/deploy/dc/ios/prod/dc_ios_en_prod_wetd46pWuR8J5CmS.json'
-            self.logger.info("Fetching translations...")
-            trans_response: requests.Response = requests.get(trans_url)
-            trans_data: List[Dict[str, str]] = trans_response.json()
-            
-            for item in trans_data:
-                for key, val in item.items():
-                    self.local_dict[key] = val
-                    
+            asyncio.run(self._fetch_game_data(credentials))
+
             # Parse Chests and Dragons
             for chest in self.data_view.get('chests', {}).get('chests', []):
                 self.chest_ids[chest['id']] = {"chest_name_key": chest['chest_name_key'], "img_name": chest['img_name']}
@@ -130,6 +120,29 @@ class DragonCityEventApp(tk.Tk):
         except Exception as e:
             self.logger.error(f"Failed to load data: {e}")
             messagebox.showerror("Error", f"Failed to load game data: {e}")
+
+    async def _fetch_game_data(self, credentials: Dict[str, str]) -> None:
+        """Fetches the game configuration sections and the English translations."""
+        url: str = self.config_manager.get_game_config_url()
+
+        if not url:
+            raise ValueError("DC_GAME_CONFIG_URL is not set in the .env file.")
+
+        options: FetchOptions = FetchOptions(
+            url=url,
+            user_id=credentials['userId'],
+            auth_token=credentials['authToken']
+        )
+
+        # Social Point's dynamic URLs do not always present a valid certificate
+        async with httpx.AsyncClient(verify=False, timeout=REQUEST_TIMEOUT_SECONDS, follow_redirects=True) as client:
+            self.logger.info("Fetching game configuration...")
+            game_config = await Config.fetch(options, client)
+            self.data_view = game_config.config.sections
+
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS, follow_redirects=True) as client:
+            self.logger.info("Fetching translations...")
+            self.localization = await Localization.create(ConfigLanguage.ENGLISH, client)
 
     def _setup_ui(self) -> None:
         self.configure(bg=self.style_prefs.get("window_background", "black"))
@@ -317,7 +330,7 @@ class DragonCityEventApp(tk.Tk):
         except Exception as e:
             self.logger.error(f"Error during event processing: {e}", exc_info=True)
             self.after(0, lambda: self.status_label.config(text="Failed!", fg="red"))
-            self.after(0, lambda: messagebox.showerror("Error", str(e)))
+            self.after(0, lambda err=e: messagebox.showerror("Error", str(err)))
 
 def main() -> None:
     """Poetry entry point."""
