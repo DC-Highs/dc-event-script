@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import asyncio
 import json
 import os
@@ -51,7 +51,8 @@ class DragonCityEventApp(tk.Tk):
         self.chests_desired: List[int] = []
         self.chests_desired_names: List[str] = []
         self.event_fp: str = ""
-        
+        self.last_save_dir: str = os.getcwd()
+
         # UI state variables
         self.event_chosen: tk.StringVar = tk.StringVar(value="Select One")
         self.event_dates_string: tk.StringVar = tk.StringVar(value="Select Event Type First")
@@ -229,11 +230,28 @@ class DragonCityEventApp(tk.Tk):
         tk.Button(dialog, text="Save & Persist", command=save).pack(pady=15)
 
     def _save_game_data(self) -> None:
-        """Saves the current game data to a JSON file for debugging."""
+        """Saves the current game data to a JSON file chosen by the user."""
+        if not self.data_view:
+            messagebox.showwarning("Warning", "There is no game data to save.")
+            return
+
+        file_path: str = filedialog.asksaveasfilename(
+            parent=self,
+            title="Save game data",
+            initialdir=self.last_save_dir,
+            initialfile="game_data.json",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        if not file_path:
+            return
+
         try:
-            with open('game_data.json', 'w', encoding='utf-8') as f:
+            with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.data_view, f, indent=4)
-            messagebox.showinfo("Success", "Game data saved to game_data.json")
+            self.last_save_dir = os.path.dirname(file_path)
+            self.logger.info(f"Game data saved to {file_path}")
+            messagebox.showinfo("Success", f"Game data saved to {file_path}")
         except Exception as e:
             self.logger.error(f"Failed to save game data: {e}")
             messagebox.showerror("Error", f"Failed to save game data: {e}")
