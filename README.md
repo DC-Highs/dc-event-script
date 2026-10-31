@@ -54,3 +54,13 @@ The output will be in the `dist/` folder.
 - `assets/`: Static templates and resources.
 - `output/`: Processed event data and images.
 - `logs/`: Application execution logs.
+
+## Running the Tests
+
+```bash
+poetry run pytest          # run the tests
+poetry run pytest --cov    # run the tests with coverage (fails below 100%)
+```
+
+The tests never touch the network, your `.env` file or your credentials. They run on every push and pull request
+through GitHub Actions (`.github/workflows/tests.yml`).

@@ -30,8 +30,10 @@ pip install requests numpy Pillow xlsxwriter opencv-python urllib3
 - **Run the main GUI**: `poetry run start`
 - **Build executable**: `poetry run build`
 - **Check all scripts**: `python -m py_compile src/**/*.py`
+- **Run the tests**: `poetry run pytest`
+- **Run the tests with coverage**: `poetry run pytest --cov` (fails below 100%)
 
-No formal testing framework (pytest/unittest) is configured. Add tests in a `tests/` folder if needed.
+Tests live in `tests/` (pytest). Keep the coverage at 100% and do not call the real network, `.env` or credentials from tests; the fixtures in `tests/conftest.py` already isolate them.
 
 ## Code Style Guidelines
 
