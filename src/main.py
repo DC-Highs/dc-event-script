@@ -62,13 +62,6 @@ class DragonCityEventApp(tk.Tk):
         self.select_all_chests: tk.IntVar = tk.IntVar(value=int(self.config_manager.app_config.get("chest_selection_status", 1)))
         
         self.asset_zip_fp: List[str] = ['/mobile/ui/', '/HD/dxt5/']
-        self.image_formats: Dict[str, str] = {
-            "DRAGON": "http://dci-static-s1.socialpointgames.com/static/dragoncity/mobile/ui/dragons/ui_",
-            "CHEST": "https://dca-static-s1.socialpointgames.com/static/dragoncity/mobile/ui/chests/ui_",
-            "DECO": "https://dca-static-s1.socialpointgames.com/static/dragoncity/mobile/ui/decorations/ui_",
-            "HABITAT": "https://dca-static-s1.socialpointgames.com/static/dragoncity/mobile/ui/habitats/ui_",
-            "BUILDING": "https://dca-static-s1.socialpointgames.com/static/dragoncity/mobile/ui/buildings/ui_"
-        }
 
         # Setup GUI
         self.title("DC Event Script - Fork by DC Highs")

@@ -49,21 +49,21 @@ def fog_data():
     }
 
 
-def downloads(tmp_path_factory=None):
+def downloads():
     requested = []
 
-    def fake_download(url, destination):
-        requested.append(url)
+    def fake_fetch(downloader):
+        requested.append(downloader.url)
 
-        if "missing" in url:
-            return False
+        if "missing" in downloader.url:
+            return None
 
-        with open(destination, "wb") as file:
-            file.write(b"garbage" if "broken" in url else png_bytes("RGBA", (16, 16), (200, 50, 50, 255)))
+        if "broken" in downloader.url:
+            return b"garbage"
 
-        return True
+        return png_bytes("RGBA", (16, 16), (200, 50, 50, 255))
 
-    return fake_download, requested
+    return fake_fetch, requested
 
 
 def fog_app(tmp_path, **overrides):
@@ -100,8 +100,8 @@ def pixel(path, x, y):
 
 
 def test_fog_event_with_the_real_template(project_dir, tmp_path, monkeypatch):
-    fake_download, requested = downloads()
-    monkeypatch.setattr("src.islands.fog_island.download_file", fake_download)
+    fake_fetch, requested = downloads()
+    monkeypatch.setattr("src.islands.fog_icons.fetch_asset", fake_fetch)
 
     process_fog_event(fog_app(tmp_path))
 
@@ -157,8 +157,8 @@ def test_fog_event_with_a_grayscale_template_and_default_icon(work_dir, tmp_path
     Image.new("RGB", (60, 60), (0, 128, 0)).save(templates / "Temp_Default.png")
     output = tmp_path / "out"
     output.mkdir()
-    fake_download, _ = downloads()
-    monkeypatch.setattr("src.islands.fog_island.download_file", fake_download)
+    fake_fetch, _ = downloads()
+    monkeypatch.setattr("src.islands.fog_icons.fetch_asset", fake_fetch)
 
     process_fog_event(fog_app(output))
 
@@ -170,8 +170,8 @@ def test_fog_event_with_a_grayscale_template_and_default_icon(work_dir, tmp_path
 
 
 def test_fog_event_without_chests_of_interest(project_dir, tmp_path, monkeypatch):
-    fake_download, _ = downloads()
-    monkeypatch.setattr("src.islands.fog_island.download_file", fake_download)
+    fake_fetch, _ = downloads()
+    monkeypatch.setattr("src.islands.fog_icons.fetch_asset", fake_fetch)
 
     process_fog_event(fog_app(tmp_path, chests_desired=[], chests_desired_names=[]))
 

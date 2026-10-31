@@ -1,3 +1,5 @@
+import io
+
 import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFont
@@ -12,6 +14,14 @@ def load_image_as_array(path: str) -> Optional[np.ndarray]:
         return np.array(Image.open(path))
     except Exception as e:
         logger.error(f"Error loading image {path}: {e}")
+        return None
+
+def load_image_from_bytes(data: bytes) -> Optional[np.ndarray]:
+    """Decodes image bytes (for example a downloaded file) into a numpy array."""
+    try:
+        return np.array(Image.open(io.BytesIO(data)))
+    except Exception as e:
+        logger.error(f"Error decoding image data: {e}")
         return None
 
 def apply_transparency_mask(image_array: np.ndarray) -> np.ndarray:

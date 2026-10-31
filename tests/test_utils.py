@@ -1,38 +1,18 @@
 import logging
-import urllib.request
 
 import numpy as np
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
-from conftest import rgba_array
+from conftest import png_bytes, rgba_array
 from src.utils.image_processing import (
     apply_transparency_mask,
     draw_text_with_offset,
     load_image_as_array,
+    load_image_from_bytes,
     resize_icon,
 )
-from src.utils.network import download_file, ensure_directory
-
-
-def test_download_file_reports_success(monkeypatch, tmp_path):
-    calls = []
-    monkeypatch.setattr(urllib.request, "urlretrieve", lambda url, destination: calls.append((url, destination)))
-
-    assert download_file("https://example.com/a.png", str(tmp_path / "a.png")) is True
-    assert calls == [("https://example.com/a.png", str(tmp_path / "a.png"))]
-
-
-def test_download_file_logs_failures(monkeypatch, caplog):
-    def fail(url, destination):
-        raise OSError("boom")
-
-    monkeypatch.setattr(urllib.request, "urlretrieve", fail)
-
-    with caplog.at_level(logging.ERROR):
-        assert download_file("https://example.com/a.png", "a.png") is False
-
-    assert "Failed to download https://example.com/a.png: boom" in caplog.text
+from src.utils.network import ensure_directory
 
 
 def test_ensure_directory(tmp_path):
@@ -54,6 +34,15 @@ def test_load_image_as_array(tmp_path, caplog):
         assert load_image_as_array(str(tmp_path / "missing.png")) is None
 
     assert "Error loading image" in caplog.text
+
+
+def test_load_image_from_bytes(caplog):
+    assert load_image_from_bytes(png_bytes("RGB", (3, 2), (1, 2, 3))).shape == (2, 3, 3)
+
+    with caplog.at_level(logging.ERROR):
+        assert load_image_from_bytes(b"not an image") is None
+
+    assert "Error decoding image data" in caplog.text
 
 
 def test_apply_transparency_mask():

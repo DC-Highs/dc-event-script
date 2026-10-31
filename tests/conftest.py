@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import numpy as np
 import pytest
 from PIL import Image, ImageFont
@@ -28,6 +29,17 @@ def hermetic_environment(monkeypatch):
 def default_font(monkeypatch):
     """Arial only exists on Windows; the default Pillow font renders the same code paths."""
     monkeypatch.setattr(ImageFont, "truetype", lambda *args, **kwargs: ImageFont.load_default_imagefont())
+
+
+@pytest.fixture
+def mock_http(monkeypatch):
+    """Makes every httpx.AsyncClient created by the app answer through `handler` instead of the network."""
+    real_client = httpx.AsyncClient
+
+    def install(handler):
+        monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs))
+
+    return install
 
 
 @pytest.fixture
@@ -79,7 +91,6 @@ def make_app(tmp_path, **overrides) -> SimpleNamespace:
         asset_versioning={"chests": {}},
         asset_zip_fp=["/mobile/ui/", "/HD/dxt5/"],
         localization=localization(),
-        image_formats={"CHEST": "https://dca-static-s1.socialpointgames.com/static/dragoncity/mobile/ui/chests/ui_"},
     )
     app.__dict__.update(overrides)
     return app
