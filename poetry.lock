@@ -349,7 +349,7 @@ files = [
 ]
 
 [package.dependencies]
-httpx = {version = ">=0.27,<1.0", optional = true, markers = "extra == \"config\" or extra == \"localization\""}
+httpx = {version = ">=0.27,<1.0", optional = true, markers = "extra == \"assets\" or extra == \"config\" or extra == \"localization\""}
 pydantic = {version = ">=2.6,<3.0", optional = true, markers = "extra == \"config\""}
 
 [package.extras]
@@ -1152,4 +1152,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12,<3.15"
-content-hash = "c8726e247d095ad71b199ce5a75da7c55f65a600186a07406c7c3989863a511d"
+content-hash = "ef453b0e80028fe2374c81e9743bc34f634bdd0c73b8287b8fcf776ddea04271"

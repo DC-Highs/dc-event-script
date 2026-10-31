@@ -8,7 +8,7 @@ import time
 import threading
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import httpx
 from dc_config import Config, FetchOptions
@@ -25,6 +25,7 @@ from src.islands.maze_island import process_maze_island
 from src.islands.puzzle_island import process_puzzle_island
 from src.islands.runner_island import process_runner_island
 from src.islands.tower_island import process_tower_island
+from src.utils.events import EVENT_SECTIONS, STATUS_STYLES, EventStatus, format_island_label, get_event_status
 
 REQUEST_TIMEOUT_SECONDS: float = 120.0
 
@@ -52,6 +53,7 @@ class DragonCityEventApp(tk.Tk):
         self.chests_desired_names: List[str] = []
         self.event_fp: str = ""
         self.last_save_dir: str = os.getcwd()
+        self.clock: Callable[[], float] = time.time
 
         # UI state variables
         self.event_chosen: tk.StringVar = tk.StringVar(value="Select One")
@@ -197,6 +199,17 @@ class DragonCityEventApp(tk.Tk):
         # Status
         self.status_label: tk.Label = tk.Label(self, text="", bg=self.style_prefs.get("window_background", "black"))
         self.status_label.place(x=20, y=260)
+        self._build_status_legend()
+
+    def _build_status_legend(self) -> None:
+        """Explains the colors of the event list."""
+        legend: List[Tuple[str, EventStatus, int]] = [
+            ("Active", EventStatus.ACTIVE, 200),
+            ("Upcoming", EventStatus.UPCOMING, 262),
+            ("Past", EventStatus.PAST, 345),
+        ]
+        for text, status, x in legend:
+            tk.Label(self, text=text, bg=STATUS_STYLES[status]["background"], fg="black", width=8).place(x=x, y=262)
 
     def _show_credentials_dialog(self) -> None:
         """Shows a dialog to update the API credentials and the game configuration endpoint."""
@@ -278,30 +291,17 @@ class DragonCityEventApp(tk.Tk):
 
     def _update_dates_list(self) -> None:
         self.dates_listbox.delete(0, tk.END)
-        name_map: Dict[str, str] = {
-            'Fog Island': 'fog_island',
-            'Grid Island': 'grid_island',
-            'Heroic Race': 'heroic_races',
-            'Maze Island': 'maze_island',
-            'Puzzle Island': 'puzzle_island',
-            'Runner Island': 'runner_island',
-            'Tower Island': 'tower_island'
-        }
-        
-        key: Optional[str] = name_map.get(self.event_chosen.get())
-        if not key or key not in self.data_view:
+        section: Optional[str] = EVENT_SECTIONS.get(self.event_chosen.get())
+
+        if not section or section not in self.data_view:
             self.dates_listbox.insert(0, "No data available")
             return
-            
-        island_data: Dict[str, Any] = self.data_view[key]
-        islands: List[Dict[str, Any]] = island_data.get('islands', [])
+
+        now: int = int(self.clock())
+        islands: List[Dict[str, Any]] = self.data_view[section].get('islands', [])
         for idx, island in enumerate(islands):
-            start_ts: int = island.get('start_ts', island.get('availability', {}).get('from', 0))
-            end_ts: int = island.get('end_ts', island.get('availability', {}).get('to', 0))
-            start: str = time.strftime("%d %b %Y", time.gmtime(start_ts))
-            end: str = time.strftime("%d %b %Y", time.gmtime(end_ts))
-            display: str = f"[{idx}] {start} - {end}"
-            self.dates_listbox.insert(tk.END, display)
+            self.dates_listbox.insert(tk.END, format_island_label(idx, island))
+            self.dates_listbox.itemconfig(idx, **STATUS_STYLES[get_event_status(island, now)])
 
     def _get_selected_island_index(self) -> Optional[int]:
         selection: tuple = self.dates_listbox.curselection()

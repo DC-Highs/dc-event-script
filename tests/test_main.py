@@ -9,6 +9,7 @@ import pytest
 
 import src.main as main_module
 from src.main import DragonCityEventApp
+from src.utils.events import STATUS_STYLES, EventStatus
 
 CONFIG_URL = "https://config.example.com/game-config"
 
@@ -205,6 +206,39 @@ def test_event_dates_are_listed_per_event_type(app):
 
     choose_event(app, "Tower Island")
     assert app.dates_listbox.get(0, tk.END) == ("No data available",)
+
+
+def test_events_are_colored_by_their_status(app):
+    now = 1_700_000_000
+    app.clock = lambda: now
+    app.data_view["fog_island"] = {
+        "islands": [
+            {"start_ts": now - 200, "end_ts": now - 100},
+            {"start_ts": now - 50, "end_ts": now + 50},
+            {"start_ts": now + 100, "end_ts": now + 200},
+            {},
+        ]
+    }
+
+    choose_event(app, "Fog Island")
+
+    backgrounds = [app.dates_listbox.itemcget(index, "background") for index in range(4)]
+    assert backgrounds[:3] == [
+        STATUS_STYLES[EventStatus.PAST]["background"],
+        STATUS_STYLES[EventStatus.ACTIVE]["background"],
+        STATUS_STYLES[EventStatus.UPCOMING]["background"],
+    ]
+    assert backgrounds[3] == ""
+    assert len(set(backgrounds[:3])) == 3
+    assert app.dates_listbox.itemcget(1, "selectbackground") == STATUS_STYLES[EventStatus.ACTIVE]["selectbackground"]
+
+
+def test_status_legend_explains_the_colors(app):
+    labels = {child.cget("text"): child.cget("bg") for child in app.winfo_children() if isinstance(child, tk.Label)}
+
+    assert labels["Active"] == STATUS_STYLES[EventStatus.ACTIVE]["background"]
+    assert labels["Upcoming"] == STATUS_STYLES[EventStatus.UPCOMING]["background"]
+    assert labels["Past"] == STATUS_STYLES[EventStatus.PAST]["background"]
 
 
 def test_selecting_nothing_keeps_the_current_event(app):

@@ -18,7 +18,7 @@ numpy = "^2.4.3"
 requests = "^2.32.5"
 openpyxl = "^3.1.5"
 python-dotenv = "^1.2.2"
-dchighs = {version = "^0.1.0", extras = ["config", "localization"]}
+dchighs = {version = "^0.1.0", extras = ["assets", "config", "localization", "statistics"]}
 
 
 [tool.poetry.scripts]
